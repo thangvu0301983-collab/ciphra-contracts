@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "ciphra.forge-test-evidence.v1",
+  "status": "passed",
+  "forkTestsIncluded": true,
+  "passed": 23,
+  "results": [
+    {
+      "suite": "BlindBallotTest",
+      "test": "test_fullEpochAppliesWinner()",
+      "status": "Success"
+    },
+    {
+      "suite": "BlindBallotTest",
+      "test": "test_lateStakeHasNoWeight()",
+      "status": "Success"
+    },
+    {
+      "suite": "BlindBallotTest",
+      "test": "test_noQuorumKeepsRoute()",
+      "status": "Success"
+    },
+    {
+      "suite": "BlindBallotTest",
+      "test": "test_phases()",
+      "status": "Success"
+    },
+    {
+      "suite": "BlindBallotTest",
+      "test": "test_safeModeBlocksApplyButFinalizeStillCloses()",
+      "status": "Success"
+    },
+    {
+      "suite": "BlindBallotTest",
+      "test": "test_tieKeepsCurrentRoute()",
+      "status": "Success"
+    },
+    {
+      "suite": "BlindBallotTest",
+      "test": "test_unrevealedVotesDoNotCount()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherStakeTest",
+      "test": "test_checkpointsAndSnapshot()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherStakeTest",
+      "test": "test_unstakeCooldown()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_ballotChangeIsTimelocked()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_ballotRoutesSealedPot()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_bountiesFromPoolOnly()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_defaultRouteBurn_split50_30_20()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_guardianHandoverAndRenounce()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_onlyBallotAppliesAndStaleEpochIgnored()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_recipientsTimelock()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_reentrantRecipientCannotDoubleDistribute()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_routeSwitchSettlesOldFeesFirst()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_safeModeFreezesBurnAndIgnoresBallot()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "test_zeroAddressesRejected()",
+      "status": "Success"
+    },
+    {
+      "suite": "CipherVaultTest",
+      "test": "testFuzz_splitAlwaysAddsUp(uint96)",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraProtectedLaunchForkTest",
+      "test": "test_fork_ciphraFullLoop()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraProtectedLaunchForkTest",
+      "test": "test_fork_protectionWindowStillApplies()",
+      "status": "Success"
+    }
+  ]
+}
