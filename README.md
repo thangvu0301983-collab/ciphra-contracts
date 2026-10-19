@@ -22,8 +22,8 @@ of the launch wallet.
 ## CIPHRA contracts (`src/`)
 
 - **CipherVault**: splits every creator fee 50% Sealed Pot (route set by the Blind Ballot: BURN to the buyback
-  Safe, COMPUTE to the compute fund, NODES to the node fund), 30% R&D treasury, 20% Break-the-Cipher bounty pool.
-  Fees that arrived under the old route are distributed before a switch. The guardian (a Safe) can change
+  wallet, COMPUTE to the compute fund, NODES to the node fund), 30% R&D treasury, 20% Break-the-Cipher bounty pool.
+  Fees that arrived under the old route are distributed before a switch. The guardian (at launch one ordinary wallet, not a multisig) can change
   recipients, the ballot or itself only after a 48-hour timelock, pays bounties from the bounty pool, and can
   pause the ballot (safe mode: route frozen at BURN). Reentrancy-guarded; no immutables.
 - **CipherStake**: stake $CPH for voting weight, read from checkpoints at a past timestamp; unstaking removes

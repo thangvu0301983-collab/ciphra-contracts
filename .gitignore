@@ -7,3 +7,4 @@ launch.json
 *.receipt.json
 protected/protected-launch.config.json
 .env*
+.env.programmable
