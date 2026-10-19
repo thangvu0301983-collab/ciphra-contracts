@@ -2,7 +2,7 @@
   "schemaVersion": "ciphra.forge-test-evidence.v1",
   "status": "passed",
   "forkTestsIncluded": true,
-  "passed": 23,
+  "passed": 42,
   "results": [
     {
       "suite": "BlindBallotTest",
@@ -107,6 +107,101 @@
     {
       "suite": "CipherVaultTest",
       "test": "testFuzz_splitAlwaysAddsUp(uint96)",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_00_initialBuyBoundCall()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_A01_customAccountingSolvencyRefundWithdrawal()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_C01_callbackAuthentication()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_F01_platformFeeExactNoBypassNoOvercharge()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_L01_liquidityCustodyAndWithdrawal()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P01_openingFdvFloor()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P02_staleOracleRejected()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P03_initialBuyAboveTwoPercentReverts()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P04_initialBuyMinimumOutputEnforced()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P05_singleAtomicInitialization()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P06_openingTaxAtLaunchSecond()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P07_openingTaxDecaysToNormal()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P08_developerTaxExemptButCapped()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P09_buyerCapIsCumulativeAndSellsDoNotRestore()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P10_recipientCapOnTransfers()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P11_canonicalRouterOnlyBuysSellsAnyRoute()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_P12_protectionExpiresAt300s()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_S01_fourQuadrantsMultiSize()",
+      "status": "Success"
+    },
+    {
+      "suite": "CiphraExactVersionForkTest",
+      "test": "test_exact_S02_secondUserAndTime()",
       "status": "Success"
     },
     {

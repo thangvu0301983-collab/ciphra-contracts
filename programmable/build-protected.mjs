@@ -139,6 +139,11 @@ await mkdir(path.join(root, "ciphra/evidence"), { recursive: true });
 const testEvidencePath = path.join(repo, "evidence/forge-tests.json");
 await writeFile(path.join(root, "ciphra/evidence/tests.json"), existsSync(testEvidencePath)
   ? await readFile(testEvidencePath) : JSON.stringify({ status: "not-run" }) + "\n");
+// Exact-version execution evidence (programmable/collect-exact-evidence.mjs). It holds no target addresses, so
+// adding it to the bundle cannot invalidate it; the rebuilt request is re-tested until the evidence is unchanged.
+const exactEvidencePath = path.join(repo, "evidence/exact-version.json");
+const hasExactEvidence = existsSync(exactEvidencePath);
+if (hasExactEvidence) await writeFile(path.join(root, "ciphra/evidence/exact-version.json"), await readFile(exactEvidencePath));
 
 // ------------------------------------------------------------------ addresses (same derivation as the helper)
 const sourcePaths = ["src", "lib", "protection", "ciphra"];
@@ -165,7 +170,13 @@ const [feedCode, routerCode, round, decimals] = await Promise.all([
 ]);
 if (keccak256(feedCode) !== pins.feedCodeHash || keccak256(routerCode) !== pins.routerCodeHash) fail("trusted infrastructure runtime differs");
 if (block.timestamp - round[3] > pins.maxAge) fail("USD feed expired");
-const price = protectedOpeningPriceV1({ supply: String(supply), answer: round[1], feedDecimals: decimals, targetFdvUsd });
+// START_TICK pins the opening price, so a rebuild that only adds evidence keeps the exact same economics.
+const fdvAt = (tick) => { const sqrt = protectedSqrtPriceAtTickV1(tick);
+  return (((1n << 192n) * supply / (sqrt * sqrt)) * round[1]) / (10n ** BigInt(18 + decimals)); };
+const price = env.START_TICK === undefined
+  ? protectedOpeningPriceV1({ supply: String(supply), answer: round[1], feedDecimals: decimals, targetFdvUsd })
+  : { initialTick: Number(env.START_TICK), sqrtPriceX96: protectedSqrtPriceAtTickV1(Number(env.START_TICK)), openingFdvUsd: fdvAt(Number(env.START_TICK)) };
+if (price.initialTick % 60 !== 0 || price.openingFdvUsd < BigInt(PROTECTED_LAUNCH_POLICY_V1.minimumFdvUsd)) fail("opening price below the USD floor");
 
 // Expected initial buy output at that price: the developer pays the normal fee only (exempt from the opening tax).
 const initialBuy = BigInt(initialBuyWei);
@@ -254,7 +265,8 @@ const cfg = { schemaVersion: "programmable.launch-pack-config.v3", chainId: "1",
   projectMetadata: metadata, launchProfile: selection, permitWindow,
   agentAttestation: { agentId: "ciphra-claude-code-builder", checkedAt: new Date().toISOString(),
     checks: [{ checkId: "protected-source-package", evidence: "protection/evidence.json" },
-      { checkId: "ciphra-vault-and-protected-fork-tests", evidence: "ciphra/evidence/tests.json" }] } };
+      { checkId: "ciphra-vault-and-protected-fork-tests", evidence: "ciphra/evidence/tests.json" },
+      ...(hasExactEvidence ? [{ checkId: "exact-version-execution-evidence", evidence: "ciphra/evidence/exact-version.json" }] : [])] } };
 const configPath = path.join(root, "protected-launch.config.json");
 await writeFile(configPath, JSON.stringify(cfg, null, 2) + "\n");
 // Library check with the explicit live profile (the CLI resolves the same profile from capabilities).

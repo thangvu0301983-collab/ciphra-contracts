@@ -61,6 +61,33 @@ programmable-launch validate launch.json --config protected-launch.config.json -
 
 On Windows run the CLI with `node --import ../programmable/win-dir-fsync-shim.mjs <cli>`.
 
+## Exact-version execution evidence
+
+`programmable/pack-exact.mjs` packs the request together with execution evidence for that exact request:
+
+1. `build-protected.mjs` writes `protected/` (nonce, permit window, opening tick pinned by `LAUNCH_NONCE`,
+   `VALID_AFTER`, `DEADLINE`, `START_TICK`), and the CLI packs `protected/launch.json`.
+2. `export-exact-fixture.mjs` turns that `launch.json` into `test/fixtures/exact-launch.json`: the Router's graph
+   targets with resolved init code and initializer calldata, in deployment order, plus the route namespace and nonce.
+3. `forge test` runs everything. `test/CiphraExactVersion.fork.t.sol` deploys those exact targets through
+   Programmable's GraphFactory on a mainnet fork (pinned by `FORK_BLOCK`), called as the 24h Router with the launch
+   wallet as `tx.origin`, and asserts each target's CREATE2 address and runtime code hash. Only the Router's permit
+   signature is not exercised. Scenarios: the bound initial buy; twelve protection scenarios (USD floor, stale feed,
+   2% opening-buy cap, minimum output, single atomic initialization, 99% opening fee, its decay, developer exemption,
+   cumulative buyer cap, recipient cap, canonical-router-only buys, expiry at 300 s); four swap quadrants at three sizes;
+   a second user over a year; liquidity custody and third-party withdrawal; callback authentication; fee backing,
+   inventory, refunds and claims; and the exact 0.30% platform fee on every route.
+4. `collect-exact-evidence.mjs` writes `evidence/exact-version.json` (no target addresses) and
+   `evidence/forge-tests.json`, which the next build packs as attestation evidence.
+
+Because the evidence is inside the source bundle and the bundle decides the CREATE2 addresses, the loop repeats until
+the regenerated evidence is byte-identical to the packed evidence. To check a submitted request, place its bytes at
+`protected/launch.json` with its config and run steps 2 to 4.
+
+The permit window starts about 24 hours after packing and lasts the Router's maximum of 24 hours, so it covers the
+review and the launch window. The opening FDV check uses the live Chainlink feed at launch; the evidence records the
+lowest ETH/USD answer at which the launch still clears USD 15,000.
+
 ## License
 
 CIPHRA sources: MIT. Vendored dependencies keep their own licenses.

@@ -11,3 +11,4 @@ protected/protected-launch.config.json
 /protected/preflight-remote.json
 /protected/status*.json
 /protected/submit-result*.json
+/test/fixtures/exact-launch.json
