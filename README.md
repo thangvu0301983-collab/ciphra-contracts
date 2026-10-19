@@ -63,6 +63,8 @@ On Windows run the CLI with `node --import ../programmable/win-dir-fsync-shim.mj
 
 ## Exact-version execution evidence
 
+Reviewer summary: [docs/EXACT-VERSION-EVIDENCE.md](docs/EXACT-VERSION-EVIDENCE.md).
+
 `programmable/pack-exact.mjs` packs the request together with execution evidence for that exact request:
 
 1. `build-protected.mjs` writes `protected/` (nonce, permit window, opening tick pinned by `LAUNCH_NONCE`,

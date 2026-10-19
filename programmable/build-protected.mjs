@@ -54,6 +54,7 @@ const description = (env.PROJECT_DESCRIPTION ?? readFileSync(path.join(repo, "pr
 if (/["\\\u0000-\u001f\u007f]/u.test(description)) fail("description: no quotes, backslashes or line breaks");
 const website = need("WEBSITE_URL"), imageUri = need("IMAGE_URI"), xUrl = env.X_URL ?? "https://x.com/ciphra_agent";
 const telegramUrl = env.TELEGRAM_URL ?? "https://t.me/ciphra_agent";
+const docsUrl = env.DOCS_URL; // e.g. the exact-version evidence page at the source commit
 const sourceUrl = need("SOURCE_URL"), revision = need("SOURCE_REVISION");
 if (!/^[0-9a-f]{40}$/.test(revision)) fail("SOURCE_REVISION must be a 40-character commit");
 const now = Math.floor(Date.now() / 1000);
@@ -242,7 +243,8 @@ const base = (role, d, unit, artifact, kind) => ({ targetId: role, compilationUn
   runtimeImmutables: imm[role]?.list ?? [] });
 const metadata = { schemaVersion: "programmable.project-metadata-input.v1", token: { name: "CIPHRA", symbol: "CPH" },
   presentation: { description, image: { sourcePath: imageSourcePath, uri: imageUri },
-    links: [{ kind: "website", uri: website }, { kind: "x", uri: xUrl }, { kind: "telegram", uri: telegramUrl }] } };
+    links: [{ kind: "website", uri: website }, { kind: "x", uri: xUrl }, { kind: "telegram", uri: telegramUrl },
+      ...(docsUrl ? [{ kind: "documentation", uri: docsUrl }] : [])] } };
 const targets = [
   { ...base("initializer", init, "launch-protection-v1", "protection/artifacts/initializer.json", "other"),
     constructorArguments: [pins.manager, profile.graphFactory, pins.feed, pins.feedCodeHash],
