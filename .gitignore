@@ -8,3 +8,6 @@ launch.json
 protected/protected-launch.config.json
 .env*
 .env.programmable
+/protected/preflight-remote.json
+/protected/status*.json
+/protected/submit-result*.json
