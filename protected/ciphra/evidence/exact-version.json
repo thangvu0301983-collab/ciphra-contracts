@@ -20,8 +20,8 @@
       "valueWei": "50000000000000000"
     },
     "permitWindow": {
-      "validAfter": "1792479956",
-      "deadline": "1792566356",
+      "validAfter": "1792682556",
+      "deadline": "1792768956",
       "lifetimeSeconds": "86400",
       "routerMaximumLifetimeSeconds": "86400"
     }
