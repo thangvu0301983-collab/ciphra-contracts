@@ -23,17 +23,21 @@ of the launch wallet.
 
 - **CipherVault**: splits every creator fee 50% Sealed Pot (route set by the Blind Ballot: BURN to the buyback
   wallet, COMPUTE to the compute fund, NODES to the node fund), 30% R&D treasury, 20% Break-the-Cipher bounty pool.
-  Fees that arrived under the old route are distributed before a switch. The guardian (at launch one ordinary wallet, not a multisig) can change
-  recipients, the ballot or itself only after a 48-hour timelock, pays bounties from the bounty pool, and can
-  pause the ballot (safe mode: route frozen at BURN). Reentrancy-guarded; no immutables.
+  Fees that arrived under the old route are distributed before a switch. The guardian (at launch one ordinary wallet, not a multisig) binds
+  the first ballot once, immediately and without a timelock; it can replace the ballot, change recipients or change
+  itself only after a 48-hour timelock, pays bounties from the bounty pool, and can pause the ballot (safe mode: route
+  frozen at BURN). Reentrancy-guarded; no immutables.
 - **CipherStake**: stake $CPH for voting weight, read from checkpoints at a past timestamp; unstaking removes
   weight at once and releases tokens after 7 days. No rewards are minted.
 - **BlindBallot** (phase 1, commit-reveal): 7-day epochs, seal days 1 to 5, reveal days 6 and 7, weight = stake
   held strictly before the epoch opened, quorum in basis points of total stake, ties keep the current route.
   Phase 2 replaces it, through the vault's timelock, with a ballot tallied on ciphertext by CIPHRA nodes.
 
-CipherStake and BlindBallot are deployed after launch (they need the token address); the guardian binds the first
-ballot once with `bindFirstBallot`, and any later ballot change goes through the timelock.
+CipherStake and BlindBallot are not part of the launch graph. At launch `CipherVault.ballot` is empty and the route
+stays at BURN. The two contracts are deployed after launch (they need the token address); the guardian then binds the
+first ballot once with `bindFirstBallot`, which takes effect immediately (no timelock), and any later ballot change
+goes through the 48-hour timelock. Whatever address is bound as the ballot can set the route among the three fixed
+recipients, so the first binding relies on the guardian until the bound ballot is verified on-chain.
 
 ## Build and test
 

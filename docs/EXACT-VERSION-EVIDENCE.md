@@ -92,6 +92,23 @@ window opens about 24 hours after packing, so it covers the 24-hour review and t
   bypass, and the total is 3,000 ppm of 21.87 ETH gross, so there is no overcharge. The platform and creator ledgers
   are isolated.
 
+## Ballot status at launch
+
+The launch graph contains the Cipher Vault but no ballot. At launch `CipherVault.ballot` is the zero address, so
+`applyRoute` cannot be called and the Sealed Pot route stays at Burn (route 0).
+
+- **First binding.** `bindFirstBallot(address)` lets the guardian bind the first ballot once, immediately, with no
+  timelock. It reverts if a ballot is already set.
+- **Later changes.** Replacing the ballot (`proposeBallot` then `executeBallot`), changing recipients and changing
+  the guardian all wait a 48-hour public timelock.
+- **Trust point.** Whatever address is bound can set the route among the three fixed recipients (buyback, compute
+  fund, node fund). Until the bound contract is verified, the first binding relies on the guardian.
+- **Planned, not verified by Programmable.** CipherStake and BlindBallot are in `src/` with their own tests
+  (`test/BlindBallot.t.sol` and the full loop in `test/CiphraProtectedLaunch.fork.t.sol`). They are not part of the
+  launch graph or this review, and can only be deployed after launch because they need the token address.
+
+The project description in the request states all of this.
+
 ## Reproduce
 
 Place the submitted bytes at `protected/launch.json` with its config, then run:
