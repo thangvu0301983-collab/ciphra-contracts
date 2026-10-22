@@ -28,7 +28,8 @@ if (failed.length) fail("failing tests: " + failed.map((r) => r.suite + "." + r.
 const exactTests = results.filter((r) => r.suite === "CiphraExactVersionForkTest");
 if (exactTests.length < 19) fail("the exact-version suite did not run completely");
 
-const dir = path.join(repo, "evidence/exact");
+const evidenceDir = path.join(repo, process.env.EVIDENCE_DIR ?? "evidence");
+const dir = path.join(repo, process.env.EXACT_EVIDENCE_DIR ?? "evidence/exact");
 const scenarios = {};
 for (const file of (await readdir(dir)).filter((f) => f.endsWith(".json")).sort()) {
   const s = JSON.parse(await readFile(path.join(dir, file), "utf8"));
@@ -39,12 +40,12 @@ if (Object.keys(scenarios).length !== exactTests.length) fail("evidence files an
 const text = JSON.stringify(scenarios);
 if (/0x[0-9a-fA-F]{40}/.test(text)) fail("scenario evidence must not contain addresses");
 
-const fx = JSON.parse(await readFile(path.join(repo, "test/fixtures/exact-launch.json"), "utf8"));
+const fx = JSON.parse(await readFile(path.join(repo, process.env.EXACT_FIXTURE ?? "test/fixtures/exact-launch.json"), "utf8"));
 const map = (...ids) => ids.filter((id) => scenarios[id]);
 const evidence = {
   schemaVersion: "ciphra.exact-version-execution-evidence.v1",
   subject: {
-    chainId: "1",
+    chainId: String(fx.chainId ?? 1),
     forkBlock: String(forkBlock),
     launchWallet: fx.launchWallet,
     developer: fx.developer,
@@ -84,7 +85,7 @@ const evidence = {
   scenarios,
   tests: { exactVersionPassed: exactTests.length, allPassed: results.length, failed: 0 },
 };
-await writeFile(path.join(repo, "evidence/exact-version.json"), JSON.stringify(evidence, null, 2) + "\n");
-await writeFile(path.join(repo, "evidence/forge-tests.json"), JSON.stringify({ schemaVersion: "ciphra.forge-test-evidence.v1",
+await writeFile(path.join(evidenceDir, "exact-version.json"), JSON.stringify(evidence, null, 2) + "\n");
+await writeFile(path.join(evidenceDir, "forge-tests.json"), JSON.stringify({ schemaVersion: "ciphra.forge-test-evidence.v1",
   status: "passed", forkTestsIncluded: true, passed: results.length, results }, null, 2) + "\n");
 console.log(JSON.stringify({ ok: true, scenarios: Object.keys(scenarios).length, allPassed: results.length }));

@@ -20,12 +20,17 @@ const pl = (p) => pathToFileURL(path.join(process.env.PL_DIR, p)).href;
 const viem = await import(pathToFileURL(createRequire(path.join(process.env.PL_DIR, "package.json")).resolve("viem")).href);
 const { concatHex, encodeAbiParameters, getAddress, keccak256, parseAbiParameters } = viem;
 const { normalizeAndPredictSubmittedGraph, deriveRouteNamespace } = await import(pl("src/graph.mjs"));
+const { PROTECTED_LAUNCH_CHAIN_PINS_V1 } = await import(pl("src/launch-protection-v1.mjs"));
+const protectedDir = path.join(repo, process.env.PROTECTED_DIR ?? "protected");
+const fixturePath = path.join(repo, process.env.EXACT_FIXTURE ?? "test/fixtures/exact-launch.json");
 
-const launchBytes = await readFile(path.join(repo, "protected/launch.json"));
+const launchBytes = await readFile(path.join(protectedDir, "launch.json"));
 const launch = JSON.parse(launchBytes);
-const config = JSON.parse(await readFile(path.join(repo, "protected/protected-launch.config.json"), "utf8"));
+const config = JSON.parse(await readFile(path.join(protectedDir, "protected-launch.config.json"), "utf8"));
 const profile = launch.launchProfile;
-const chainContext = { chainId: "1", router: profile.router, graphFactory: profile.graphFactory };
+const chainId = String(launch.chainId ?? config.chainId ?? "1");
+const pins = PROTECTED_LAUNCH_CHAIN_PINS_V1[chainId];
+const chainContext = { chainId, router: profile.router, graphFactory: profile.graphFactory };
 const { graphBundle, predictions } = normalizeAndPredictSubmittedGraph(launch.graphBundle, config.launchWallet, config.nonce,
   { chainContext, projectMetadataHash: launch.projectMetadataHash });
 const routeNamespace = deriveRouteNamespace(graphBundle.sourceBundleSha256, config.launchWallet, chainContext);
@@ -49,6 +54,7 @@ const [, , startTick, developer, minimumTokensOut] = init.initializer.arguments;
 const role = (id) => ordered.find((t) => t.targetId === id);
 const fixture = {
   schemaVersion: "ciphra.exact-launch-fixture.v1",
+  chainId: Number(chainId), poolManager: getAddress(profile.poolManager), universalRouter: getAddress(pins.router), feed: getAddress(pins.feed),
   launchJsonSha256: "sha256:" + createHash("sha256").update(launchBytes).digest("hex"),
   router: getAddress(profile.router), graphFactory: getAddress(profile.graphFactory), launchWallet: getAddress(config.launchWallet),
   routeNamespace, routeNonce: config.nonce,
@@ -63,7 +69,7 @@ const fixture = {
   targetsAbi,
   creationCodeHashes: Object.fromEntries(ordered.map((t) => [t.targetId, t.creationCodeHash])),
 };
-await mkdir(path.join(repo, "test/fixtures"), { recursive: true });
-await writeFile(path.join(repo, "test/fixtures/exact-launch.json"), JSON.stringify(fixture, null, 2) + "\n");
+await mkdir(path.dirname(fixturePath), { recursive: true });
+await writeFile(fixturePath, JSON.stringify(fixture, null, 2) + "\n");
 console.log(JSON.stringify({ ok: true, launchJsonSha256: fixture.launchJsonSha256, order: ordered.map((t) => t.targetId),
   token: fixture.token, hook: fixture.hook }, null, 2));

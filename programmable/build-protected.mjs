@@ -20,11 +20,16 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const root = path.join(repo, "protected");
 const env = process.env;
+// CHAIN_ID 1 (Ethereum, default) or 8453 (Base). Base writes its own protected/ tree: its sealed package differs.
+const chain = Number(env.CHAIN_ID ?? 1);
+const isBase = chain === 8453;
+const root = path.join(repo, env.PROTECTED_DIR ?? (isBase ? "protected-base" : "protected"));
+const evidenceDir = path.join(repo, env.EVIDENCE_DIR ?? (isBase ? "evidence/base" : "evidence"));
 const fail = (m) => { console.error("build-protected: " + m); process.exit(1); };
 const need = (k) => env[k] || fail("set " + k);
-if (!env.PL_DIR) fail("set PL_DIR to the installed @programmable/launch 4.1.7 package directory");
+if (!env.PL_DIR) fail("set PL_DIR to the installed @programmable/launch package directory (4.1.7 for Ethereum, 4.2.0 for Base)");
+if (chain !== 1 && chain !== 8453) fail("CHAIN_ID must be 1 or 8453");
 const pl = (p) => pathToFileURL(path.join(env.PL_DIR, p)).href;
 
 const viem = await import(pathToFileURL(createRequire(path.join(env.PL_DIR, "package.json")).resolve("viem")).href);
@@ -37,7 +42,7 @@ const { buildSourceBundle } = await import(pl("src/source-bundle.mjs"));
 const { deriveRouteNamespace } = await import(pl("src/graph.mjs"));
 const { resolveDirectNativeProfile } = await import(pl("src/profile-direct-native-v1.mjs"));
 const { GRAPH_TARGET_SALT_TYPE, LAUNCH_SEEDED_CONCENTRATED_LIQUIDITY_VECTORS } = await import(pl("src/constants.mjs"));
-const kitDir = path.join(env.PL_DIR, "contracts/launch-protection-v1");
+const kitDir = path.join(env.PL_DIR, isBase ? "contracts/base-launch-protection-v1" : "contracts/launch-protection-v1");
 const ZERO = "0x0000000000000000000000000000000000000000";
 const sha = (b) => "sha256:" + createHash("sha256").update(b).digest("hex");
 
@@ -50,7 +55,7 @@ const initialBuyWei = String(env.INITIAL_BUY_WEI ?? "30000000000000000");
 const targetFdvUsd = String(env.TARGET_FDV_USD ?? "17000");
 const minOutBps = BigInt(env.MIN_OUT_BPS ?? 9900);
 const nonce = env.LAUNCH_NONCE ?? "0x" + randomBytes(32).toString("hex");
-const description = (env.PROJECT_DESCRIPTION ?? readFileSync(path.join(repo, "programmable/description.txt"), "utf8")).normalize("NFC").trim();
+const description = (env.PROJECT_DESCRIPTION ?? readFileSync(path.join(repo, env.DESCRIPTION_FILE ?? (isBase ? "programmable/description-base.txt" : "programmable/description.txt")), "utf8")).normalize("NFC").trim();
 if (/["\\\u0000-\u001f\u007f]/u.test(description)) fail("description: no quotes, backslashes or line breaks");
 const website = need("WEBSITE_URL"), imageUri = need("IMAGE_URI"), xUrl = env.X_URL ?? "https://x.com/ciphra_agent";
 const telegramUrl = env.TELEGRAM_URL ?? "https://t.me/ciphra_agent";
@@ -62,12 +67,17 @@ const permitWindow = { validAfter: String(env.VALID_AFTER ?? now - 60), deadline
 
 // ------------------------------------------------------------------ live chain and capabilities
 const client = createPublicClient({ transport: http(need("ETH_RPC_URL")) });
-const capabilities = await (await fetch("https://api.programmable.market/v3/capabilities")).json();
-if (capabilities.chain?.id !== "1" || capabilities.profile?.profileVersion !== "3.6.0" || capabilities.profile?.productionLaunchAuthorized !== true) {
-  fail("current Ethereum capabilities are required");
+const capabilities = await (await fetch(isBase ? "https://api.programmable.market/v4/chains/8453/capabilities"
+  : "https://api.programmable.market/v3/capabilities")).json();
+if (capabilities.chain?.id !== String(chain) || capabilities.profile?.profileVersion !== "3.6.0" || capabilities.profile?.productionLaunchAuthorized !== true
+  || (isBase && (capabilities.mode !== "active" || capabilities.publicLaunchAuthorized !== true))) {
+  fail("current capabilities for chain " + chain + " are required");
 }
+if (isBase && (await client.getChainId()) !== 8453) fail("ETH_RPC_URL must be a Base RPC");
+const tradeFeePolicy = isBase ? capabilities.profile?.programmableTradeFeePolicy : capabilities.programmableTradeFeePolicy?.policy;
 const status = await (await fetch("https://api.programmable.market/v1/launch-protection")).json();
-if (status.policyVersion !== "programmable.launch-protection.v1" || status.minimumFdvUsd !== PROTECTED_LAUNCH_POLICY_V1.minimumFdvUsd) {
+if (status.policyVersion !== "programmable.launch-protection.v1" || status.minimumFdvUsd !== PROTECTED_LAUNCH_POLICY_V1.minimumFdvUsd
+  || !(status.supportedChains ?? ["1"]).includes(String(chain))) {
   fail("live launch-protection policy differs from the installed package");
 }
 
@@ -85,7 +95,9 @@ const selection = { schemaVersion: "programmable.direct-native-hook-graph-profil
       schemaVersion: "programmable.direct-native-liquidity-model-assessment.v1", status: "required", requestClaimsExecution: false,
       requiredVectorIds: [...LAUNCH_SEEDED_CONCENTRATED_LIQUIDITY_VECTORS] } },
 };
-const profile = resolveDirectNativeProfile(selection, { profileVersion: "3.6.0", programmableTradeFeePolicy: capabilities.programmableTradeFeePolicy?.policy });
+const profile = resolveDirectNativeProfile(selection, isBase
+  ? { chainId: "8453", profileVersion: "3.6.0", programmableTradeFeePolicy: tradeFeePolicy }
+  : { profileVersion: "3.6.0", programmableTradeFeePolicy: tradeFeePolicy });
 
 // ------------------------------------------------------------------ write the exact package sources + CipherVault
 async function exactFile(file, content) {
@@ -99,8 +111,11 @@ async function exactFile(file, content) {
 const standardBytes = await readFile(path.join(kitDir, "standard-json.json"));
 for (const [source, value] of Object.entries(JSON.parse(standardBytes).sources)) await exactFile(path.join(root, source), value.content);
 await exactFile(path.join(root, "protection/standard-json.json"), standardBytes);
-const kitNames = { initializer: "ProtectedNativeInitializerV1", token: "ProtectedLaunchTokenV1", hook: "ProtectedNative30HookV1",
-  module: "LaunchProtectionModuleV1", feeVault: "EthereumNativeFeeVaultV3", openingTaxVault: "EthereumNativeFeeVaultV3" };
+const kitNames = isBase
+  ? { initializer: "BaseProtectedNativeInitializerV1", token: "ProtectedLaunchTokenV1", hook: "BaseProtectedNative30HookV1",
+    module: "BaseLaunchProtectionModuleV1", feeVault: "EthereumNativeFeeVaultV3", openingTaxVault: "EthereumNativeFeeVaultV3" }
+  : { initializer: "ProtectedNativeInitializerV1", token: "ProtectedLaunchTokenV1", hook: "ProtectedNative30HookV1",
+    module: "LaunchProtectionModuleV1", feeVault: "EthereumNativeFeeVaultV3", openingTaxVault: "EthereumNativeFeeVaultV3" };
 const artifacts = {};
 for (const [role, name] of Object.entries(kitNames)) {
   const bytes = await readFile(path.join(kitDir, name + ".artifact.json"));
@@ -138,12 +153,12 @@ const imageSourcePath = "assets/ciphra-logo.png";
 await mkdir(path.join(root, "assets"), { recursive: true });
 await copyFile(path.join(repo, imageSourcePath), path.join(root, imageSourcePath));
 await mkdir(path.join(root, "ciphra/evidence"), { recursive: true });
-const testEvidencePath = path.join(repo, "evidence/forge-tests.json");
+const testEvidencePath = path.join(evidenceDir, "forge-tests.json");
 await writeFile(path.join(root, "ciphra/evidence/tests.json"), existsSync(testEvidencePath)
   ? await readFile(testEvidencePath) : JSON.stringify({ status: "not-run" }) + "\n");
 // Exact-version execution evidence (programmable/collect-exact-evidence.mjs). It holds no target addresses, so
 // adding it to the bundle cannot invalidate it; the rebuilt request is re-tested until the evidence is unchanged.
-const exactEvidencePath = path.join(repo, "evidence/exact-version.json");
+const exactEvidencePath = path.join(evidenceDir, "exact-version.json");
 const hasExactEvidence = existsSync(exactEvidencePath);
 if (hasExactEvidence) await writeFile(path.join(root, "ciphra/evidence/exact-version.json"), await readFile(exactEvidencePath));
 
@@ -156,11 +171,11 @@ function deriveRootAddress({ role, initCodeHash, applicantSalt }) {
   const field = Buffer.from(role), length = Buffer.alloc(4); length.writeUInt32BE(field.length);
   const targetIdHash = keccak256("0x" + Buffer.concat([Buffer.from("programmable.create2-graph-target-id.v1"), Buffer.from([0]), length, field]).toString("hex"));
   const salt = keccak256(encodeAbiParameters(parseAbiParameters("bytes32,uint256,address,bytes32,bytes32,bytes32,bytes32,address"),
-    [saltType, 1n, profile.graphFactory, namespace, nonce, targetIdHash, applicantSalt, profile.router]));
+    [saltType, BigInt(chain), profile.graphFactory, namespace, nonce, targetIdHash, applicantSalt, profile.router]));
   return { salt, address: getCreate2Address({ from: profile.graphFactory, salt, bytecodeHash: initCodeHash }) };
 }
 
-const pins = PROTECTED_LAUNCH_CHAIN_PINS_V1[1];
+const pins = PROTECTED_LAUNCH_CHAIN_PINS_V1[chain];
 const owner = launchWallet;
 const supply = 1_000_000_000n * 10n ** 18n;
 const exemptions = protectedLaunchExemptionsV1(owner, []);
@@ -172,6 +187,14 @@ const [feedCode, routerCode, round, decimals] = await Promise.all([
 ]);
 if (keccak256(feedCode) !== pins.feedCodeHash || keccak256(routerCode) !== pins.routerCodeHash) fail("trusted infrastructure runtime differs");
 if (block.timestamp - round[3] > pins.maxAge) fail("USD feed expired");
+// Base: the L2 sequencer must be up and past its one-hour grace period, as the initializer checks at launch.
+let sequencerFeedCodeHash;
+if (pins.sequencerFeed) {
+  const seqCode = await client.getCode({ address: pins.sequencerFeed, blockNumber: block.number });
+  const seq = await client.readContract({ address: pins.sequencerFeed, abi: parseAbi(["function latestRoundData() view returns(uint80,int256,uint256,uint256,uint80)"]), functionName: "latestRoundData", blockNumber: block.number });
+  if (!seqCode || seqCode === "0x" || seq[1] !== 0n || seq[2] === 0n || seq[2] >= block.timestamp || block.timestamp - seq[2] <= 3600n) fail("Base sequencer is unavailable or recovering");
+  sequencerFeedCodeHash = keccak256(seqCode);
+}
 // START_TICK pins the opening price, so a rebuild that only adds evidence keeps the exact same economics.
 const fdvAt = (tick) => { const sqrt = protectedSqrtPriceAtTickV1(tick);
   return (((1n << 192n) * supply / (sqrt * sqrt)) * round[1]) / (10n ** BigInt(18 + decimals)); };
@@ -192,7 +215,7 @@ const expectedOut = L * (sqrtUpper - sqrtNext) / Q96;
 const minimumTokensOut = expectedOut * minOutBps / 10_000n;
 if (minimumTokensOut > supply / 50n) fail("initial buy would exceed the 2% limit");
 
-const salt = (role, attempt = 0n) => keccak256(encodeAbiParameters(parseAbiParameters("uint256,address,bytes32,string,uint256"), [1n, owner, nonce, role, attempt]));
+const salt = (role, attempt = 0n) => keccak256(encodeAbiParameters(parseAbiParameters("uint256,address,bytes32,string,uint256"), [BigInt(chain), owner, nonce, role, attempt]));
 function graphRoot(role, abiOwner, args, flags) {
   const initCode = encodeDeployData({ abi: abiOwner.abi, bytecode: abiOwner.creationBytecode ?? abiOwner.bytecode, args });
   const initCodeHash = keccak256(initCode);
@@ -230,9 +253,9 @@ const moduleRuntime = immutables(artifacts.module, { kernel: hook.address, token
   router: pins.router, routerCodeHash: pins.routerCodeHash, normalBuyFeePpm: (30 + creatorBps) * 100 });
 const imm = {
   initializer: immutables(artifacts.initializer, { poolManager: pins.manager, graphFactory: profile.graphFactory, nativeUsdFeed: pins.feed,
-    feedCodeHash: pins.feedCodeHash, feedDecimals: decimals, MAX_FEED_AGE: pins.maxAge }),
+    feedCodeHash: pins.feedCodeHash, feedDecimals: decimals, MAX_FEED_AGE: pins.maxAge, ...(isBase ? { sequencerFeedCodeHash } : {}) }),
   token: immutables(artifacts.token, { initializer: init.address, poolManager: pins.manager, launchSupply: supply, walletTokenLimit: supply / 50n }),
-  hook: immutables(artifacts.hook, { poolManager: pins.manager, CANONICAL_POOL_MANAGER: pins.manager, CHAIN_ID: 1, token: token.address,
+  hook: immutables(artifacts.hook, { poolManager: pins.manager, CANONICAL_POOL_MANAGER: pins.manager, CHAIN_ID: chain, token: token.address,
     lpFee: 0, tickSpacing: 60, initialSqrtPriceX96: price.sqrtPriceX96, initializer: init.address, creatorBuyFeeBps: creatorBps,
     creatorSellFeeBps: creatorBps, module: protectionModule, moduleCodeHash: moduleRuntime.runtimeCodeHash, maxModuleLpFeePips: 0, feeVault, openingTaxVault }),
 };
@@ -260,7 +283,7 @@ const targets = [
     constructorArguments: [roles.guardian, roles.buyback, roles.compute, roles.nodes, roles.rnd] },
 ];
 // No profileVersion: the CLI then binds the live /v3/capabilities profile (3.6.0) and its exact fee policy.
-const cfg = { schemaVersion: "programmable.launch-pack-config.v3", chainId: "1", launchWallet, nonce,
+const cfg = { schemaVersion: "programmable.launch-pack-config.v3", ...(isBase ? { profileVersion: "3.6.0" } : {}), chainId: String(chain), launchWallet, nonce,
   source: { root: ".", paths: sourcePaths, sourceLineageNonce: env.SOURCE_LINEAGE_NONCE ?? "1", publicOrigin: { url: sourceUrl, revision } },
   compilationUnits: [{ compilationUnitId: "launch-protection-v1", standardJson: "protection/standard-json.json" },
     { compilationUnitId: "ciphra-vault", standardJson: "ciphra/standard-json.json" }],
@@ -275,7 +298,7 @@ await writeFile(configPath, JSON.stringify(cfg, null, 2) + "\n");
 // Library check with the explicit live profile (the CLI resolves the same profile from capabilities).
 const checkPath = path.join(root, ".protected-launch.check.json");
 await writeFile(checkPath, JSON.stringify({ ...cfg, profileVersion: "3.6.0" }, null, 2) + "\n");
-const built = await buildLaunch({ configPath: checkPath, directNativeTradeFeePolicy: capabilities.programmableTradeFeePolicy?.policy });
+const built = await buildLaunch({ configPath: checkPath, directNativeTradeFeePolicy: tradeFeePolicy });
 await (await import("node:fs/promises")).unlink(checkPath);
 for (const [role, d] of Object.entries({ initializer: init, token, hook, vault })) {
   if (built.predictions.find((x) => x.targetId === role)?.predictedAddress.toLowerCase() !== d.address.toLowerCase()) fail("prediction differs for " + role);

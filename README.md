@@ -67,7 +67,7 @@ On Windows run the CLI with `node --import ../programmable/win-dir-fsync-shim.mj
 
 ## Exact-version execution evidence
 
-Reviewer summary: [docs/EXACT-VERSION-EVIDENCE.md](docs/EXACT-VERSION-EVIDENCE.md).
+Reviewer summary: [docs/EXACT-VERSION-EVIDENCE.md](docs/EXACT-VERSION-EVIDENCE.md) (Ethereum) and [docs/EXACT-VERSION-EVIDENCE-BASE.md](docs/EXACT-VERSION-EVIDENCE-BASE.md) (Base: `CHAIN_ID=8453`, CLI 4.2.0, output in `protected-base/`).
 
 `programmable/pack-exact.mjs` packs the request together with execution evidence for that exact request:
 

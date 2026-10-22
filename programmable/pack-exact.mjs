@@ -18,6 +18,14 @@ for (const k of ["PL_DIR", "SOLCJS_DIR", "ETH_RPC_URL", "LAUNCH_NONCE", "VALID_A
   if (!env[k]) { console.error("pack-exact: set " + k); process.exit(1); }
 }
 const cli = path.join(env.PL_DIR, "bin/programmable-launch.mjs");
+// Base (CHAIN_ID=8453) uses its own protected/, evidence and fixture paths; the build script derives the same defaults.
+const isBase = Number(env.CHAIN_ID ?? 1) === 8453;
+const PROTECTED = env.PROTECTED_DIR ?? (isBase ? "protected-base" : "protected");
+const EVIDENCE = env.EVIDENCE_DIR ?? (isBase ? "evidence/base" : "evidence");
+const EXACT_DIR = env.EXACT_EVIDENCE_DIR ?? (isBase ? "evidence/base/exact/" : "evidence/exact/");
+const FIXTURE = env.EXACT_FIXTURE ?? (isBase ? "test/fixtures/exact-launch-base.json" : "test/fixtures/exact-launch.json");
+const FORGE_ARGS = (env.FORGE_ARGS ?? (isBase ? "--no-match-contract CiphraProtectedLaunchForkTest" : "")).split(" ").filter(Boolean);
+Object.assign(env, { PROTECTED_DIR: PROTECTED, EVIDENCE_DIR: EVIDENCE, EXACT_EVIDENCE_DIR: EXACT_DIR, EXACT_FIXTURE: FIXTURE });
 const shim = ["--import", pathToShim()];
 function pathToShim() { return "file:///" + path.join(repo, "programmable/win-dir-fsync-shim.mjs").replace(/\\/g, "/").replace(/^\/+/, ""); }
 const run = (cmd, args, cwd = repo, stdio = "inherit") => execFileSync(cmd, args, { cwd, env, stdio, maxBuffer: 1 << 28 });
@@ -27,19 +35,19 @@ for (let i = 1; i <= 4; i++) {
   console.error(`pack-exact: iteration ${i}`);
   run(process.execPath, ["programmable/build-protected.mjs"]);
   run(process.execPath, [...shim, cli, "pack", "--config", "protected-launch.config.json", "--output", "launch.json"],
-    path.join(repo, "protected"), ["ignore", "ignore", "inherit"]);
+    path.join(repo, PROTECTED), ["ignore", "ignore", "inherit"]);
   run(process.execPath, ["programmable/export-exact-fixture.mjs"]);
-  rmSync(path.join(repo, "evidence/exact"), { recursive: true, force: true });
-  mkdirSync(path.join(repo, "evidence/exact"), { recursive: true });
+  rmSync(path.join(repo, EXACT_DIR), { recursive: true, force: true });
+  mkdirSync(path.join(repo, EXACT_DIR), { recursive: true });
   const forgeOut = path.join(os.tmpdir(), "ciphra-forge-tests.json");
-  writeFileSync(forgeOut, run("forge", ["test", "--json"], repo, ["ignore", "pipe", "inherit"]));
+  writeFileSync(forgeOut, run("forge", ["test", "--json", ...FORGE_ARGS], repo, ["ignore", "pipe", "inherit"]));
   run(process.execPath, ["programmable/collect-exact-evidence.mjs", forgeOut]);
-  const same = ["exact-version.json", "tests.json"].every((f) => read(path.join(repo, "protected/ciphra/evidence", f)).equals(
-    read(path.join(repo, "evidence", f === "tests.json" ? "forge-tests.json" : f))));
+  const same = ["exact-version.json", "tests.json"].every((f) => read(path.join(repo, PROTECTED, "ciphra/evidence", f)).equals(
+    read(path.join(repo, EVIDENCE, f === "tests.json" ? "forge-tests.json" : f))));
   if (same) {
     run(process.execPath, [...shim, cli, "validate", "launch.json", "--config", "protected-launch.config.json"],
-      path.join(repo, "protected"), ["ignore", "ignore", "inherit"]);
-    console.log(JSON.stringify({ ok: true, iterations: i, fixture: JSON.parse(readFileSync(path.join(repo, "test/fixtures/exact-launch.json"))).launchJsonSha256 }));
+      path.join(repo, PROTECTED), ["ignore", "ignore", "inherit"]);
+    console.log(JSON.stringify({ ok: true, iterations: i, fixture: JSON.parse(readFileSync(path.join(repo, FIXTURE))).launchJsonSha256 }));
     process.exit(0);
   }
 }

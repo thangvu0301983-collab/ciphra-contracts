@@ -147,11 +147,13 @@ contract CiphraExactVersionForkTest is Test {
     using StateLibrary for IPoolManager;
     using PoolIdLibrary for PoolKey;
 
-    IPoolManager constant PM = IPoolManager(0x000000000004444c5dc75cB358380D2e3dE08A90);
-    IGraphFactory constant FACTORY = IGraphFactory(0xB012e4A8F2c5FC4E8E4faCA9D5Ad6FfF13FBA887);
-    IUniversalRouter constant UR = IUniversalRouter(0xd92A36B0000531EF3063dEd4De20A0783308446C);
-    address constant FEED = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+    // Chain infrastructure comes from the fixture (Ethereum defaults keep older fixtures working).
+    IPoolManager PM = IPoolManager(0x000000000004444c5dc75cB358380D2e3dE08A90);
+    IGraphFactory FACTORY = IGraphFactory(0xB012e4A8F2c5FC4E8E4faCA9D5Ad6FfF13FBA887);
+    IUniversalRouter UR = IUniversalRouter(0xd92A36B0000531EF3063dEd4De20A0783308446C);
+    address FEED = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
     address constant TREASURY = 0xD88539d3c4C460136a733A3Fd60cf6BF269079da;
+    string evidenceDir = "evidence/exact/";
     bytes32 constant TOPOLOGY = keccak256("ciphra.exact-version-evidence.topology");
     uint256 constant NORMAL_PPM = 23_000; // 0.30% platform + 2% creator, both sides
     uint256 constant OPENING_TOTAL_PPM = 990_000;
@@ -192,7 +194,15 @@ contract CiphraExactVersionForkTest is Test {
         if (forkBlock == 0) vm.createSelectFork(rpc);
         else vm.createSelectFork(rpc, forkBlock);
         forked = true;
-        fixture = vm.readFile("test/fixtures/exact-launch.json");
+        fixture = vm.readFile(vm.envOr("EXACT_FIXTURE", string("test/fixtures/exact-launch.json")));
+        evidenceDir = vm.envOr("EXACT_EVIDENCE_DIR", string("evidence/exact/"));
+        if (vm.keyExistsJson(fixture, ".poolManager")) {
+            PM = IPoolManager(vm.parseJsonAddress(fixture, ".poolManager"));
+            FACTORY = IGraphFactory(vm.parseJsonAddress(fixture, ".graphFactory"));
+            UR = IUniversalRouter(vm.parseJsonAddress(fixture, ".universalRouter"));
+            FEED = vm.parseJsonAddress(fixture, ".feed");
+            assertEq(block.chainid, vm.parseJsonUint(fixture, ".chainId"), "fork chain matches the fixture");
+        }
         router = vm.parseJsonAddress(fixture, ".router");
         launchWallet = vm.parseJsonAddress(fixture, ".launchWallet");
         developer = vm.parseJsonAddress(fixture, ".developer");
@@ -260,7 +270,10 @@ contract CiphraExactVersionForkTest is Test {
     function _urBuy(address who, uint256 amountIn) internal returns (bool ok, bytes memory ret, uint256 out) {
         bytes memory actions = abi.encodePacked(uint8(0x06), uint8(0x0c), uint8(0x0f)); // exact-in single, settle all, take all
         bytes[] memory params = new bytes[](3);
-        params[0] = abi.encode(key, true, uint128(amountIn), uint128(0), bytes(""));
+        // Base's Universal Router release adds minHopPriceX36 to ExactInputSingleParams.
+        params[0] = block.chainid == 8453
+            ? abi.encode(key, true, uint128(amountIn), uint128(0), uint256(0), bytes(""))
+            : abi.encode(key, true, uint128(amountIn), uint128(0), bytes(""));
         params[1] = abi.encode(Currency.wrap(address(0)), amountIn);
         params[2] = abi.encode(key.currency1, uint256(0));
         bytes[] memory inputs = new bytes[](1);
@@ -406,7 +419,7 @@ contract CiphraExactVersionForkTest is Test {
 
     function _end() internal {
         string memory out = vm.serializeBool(obj, "passed", true);
-        vm.writeJson(out, string.concat("evidence/exact/", obj, ".json"));
+        vm.writeJson(out, string.concat(evidenceDir, obj, ".json"));
     }
 
     // ================================================================== initial buy (bound call)
